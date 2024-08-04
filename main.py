@@ -1,74 +1,14 @@
 import os
-from PIL import Image
-from io import BytesIO
-import requests
 import datetime
 import telebot
-import time
 import csv
-from telebot import types
-from config import bot_key, admins, request_url
+from config import bot_key, admins
+from generate_image import save_image
 
 filepath = ''
 
-import fal_client
-
 def close(e):
-    print(f'Ошибка в функции: {e}')
-
-
-# функции по нейронке
-
-def url_to_image(url, retries=3):
-    try:
-        for _ in range(retries):
-            try:
-                response = requests.get(url, timeout=60)
-                response.raise_for_status()
-                img_data = BytesIO(response.content)
-                img = Image.open(img_data)
-                return img
-            except requests.exceptions.RequestException as e:
-                print(f"Request failed: {e}")
-                time.sleep(2)  # Wait before retrying
-            return 'Ошибка'
-    except Exception as e:
-        close(e)
-        return
-
-
-def request_to_ip(prompt):
-    try:
-        handler = fal_client.submit(
-            request_url,
-            arguments={
-                "prompt": prompt
-            },
-        )
-        result = handler.get()
-        print(f"Request result: {result}")
-        image_url = result['images'][0]['url']
-        return image_url
-    except Exception as e:
-        close(e)
-        return
-
-
-def save_image(prompt):
-    try:
-        global filepath
-        image_url = request_to_ip(prompt)
-        image = url_to_image(image_url)
-        if image == 'Ошибка':
-            filepath = 'Ошибка'
-        if not os.path.exists('images'):
-            os.makedirs('images')
-        filepath = f'images/{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.jpg'
-        image.save(filepath)
-        print(f"Image saved to {filepath}")
-    except Exception as e:
-        close(e)
-        return
+    print(f'Ошибка в боте: {e}')
 
 
 # создание бд или запись бд в локальный список
@@ -91,7 +31,6 @@ else:
 # функции по боту
 
 bot = telebot.TeleBot(bot_key)
-
 
 @bot.message_handler(commands=['start'])
 def start_handler(message):
@@ -161,23 +100,18 @@ def generic_handler(message):
                     bot.send_message(admin_id,
                                      f'Кто то пытался использовать команду broadcast. \nid = {message.from_user.id}. Username = @{message.from_user.username}')
         else:
-            if filepath != 'Ошибка':
-                bot.send_message(message.chat.id,
-                                 'Запрос на генерацию принят, ждите. \nИз-за высокой нагрузки примерное время генерации составляет: 2 минуты')
-                save_image(message.text)
+            bot.send_message(message.chat.id,
+                             'Запрос на генерацию принят, ждите. \nИз-за высокой нагрузки примерное время генерации составляет: 2 минуты')
+            filepath = save_image(message.text)
 
-                # keyboard = types.InlineKeyboardMarkup(row_width=1)
-                # request_file_button = types.InlineKeyboardButton('📎 Запросить файл без сжатия', callback_data='без сжатия')
-                # keyboard.add(request_file_button)
+            # keyboard = types.InlineKeyboardMarkup(row_width=1)
+            # request_file_button = types.InlineKeyboardButton('📎 Запросить файл без сжатия', callback_data='без сжатия')
+            # keyboard.add(request_file_button)
 
-                with open(filepath, 'rb') as f:
-                    bot.send_photo(message.chat.id, f)
-                    # f.seek(0)
-                    # bot.send_document(message.chat.id, f, caption='Это оригинал фото в высоком качестве')
-
-            else:
-                bot.send_message(message.chat.id,
-                                 'Не получилось сгенерировать изображение по вашему запросу (\nПопробуйте еще раз через пару минут')
+            with open(filepath, 'rb') as f:
+                bot.send_photo(message.chat.id, f)
+                # f.seek(0)
+                # bot.send_document(message.chat.id, f, caption='Это оригинал фото в высоком качестве')
     except Exception as e:
         bot.send_message(message.chat.id, 'Не удалось сгенерировать фото. Повторите свой запрос')
         close(e)
