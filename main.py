@@ -6,6 +6,7 @@ from config import bot_key, admins
 from generate_image import save_image
 
 filepath = ''
+db_path = 'data/users.csv'
 
 def close(e):
     print(f'Ошибка в боте: {e}')
@@ -13,20 +14,11 @@ def close(e):
 
 # создание бд или запись бд в локальный список
 
-local_user_list = []
-file_exists = os.path.isfile('users.csv')
+file_exists = os.path.isfile(db_path)
 if not file_exists:
-    with open('users.csv', 'a', newline='') as csvfile:
+    with open(db_path, 'a', newline='') as csvfile:
         writer = csv.writer(csvfile, dialect='excel')
         writer.writerow(['user_id', 'time_registred'])
-
-else:
-    with open('users.csv') as f:
-        csv_reader = csv.reader(f)
-        next(csv_reader, None)
-        for user in csv_reader:
-            if len(user) > 0:
-                local_user_list.append(user[0])
 
 # функции по боту
 
@@ -34,8 +26,14 @@ bot = telebot.TeleBot(bot_key)
 
 @bot.message_handler(commands=['start'])
 def start_handler(message):
-    global local_user_list
     try:
+        local_user_list = []
+        with open(db_path) as f:
+            csv_reader = csv.reader(f)
+            next(csv_reader, None)
+            for user in csv_reader:
+                if len(user) > 0:
+                    local_user_list.append(user[0])
         if str(message.chat.id) not in local_user_list:
             add_user(message.chat.id)
 
@@ -71,7 +69,28 @@ def help_handler(message):
     except Exception as e:
         close(e)
         return
-
+@bot.message_handler(commands=['user_count'])
+def user_count_handler(message):
+    try:
+        if str(message.from_user.id) in admins:
+            with open('data/users.csv') as f:
+                _ = f.readline()
+                line = f.readline()
+                users_number = 1
+                while True:
+                    if f.readline() != '':
+                        users_number += 1
+                    else:
+                        break
+            bot.send_message(message.chat.id, f'Количество пользователей: {users_number}')
+        else:
+            bot.send_message(message.chat.id, 'У вас нет доступа к этой команде')
+            for admin_id in admins:
+                bot.send_message(admin_id,
+                                 f'Кто то пытался использовать команду user_count. \nid = {message.from_user.id}. Username = @{message.from_user.username}')
+    except Exception as e:
+        close(e)
+        return
 
 @bot.callback_query_handler(func=lambda x: True)
 def button_handler(call):
@@ -112,6 +131,7 @@ def generic_handler(message):
                 bot.send_photo(message.chat.id, f)
                 # f.seek(0)
                 # bot.send_document(message.chat.id, f, caption='Это оригинал фото в высоком качестве')
+            os.remove(filepath)
     except Exception as e:
         bot.send_message(message.chat.id, 'Не удалось сгенерировать фото. Повторите свой запрос')
         close(e)
@@ -119,12 +139,10 @@ def generic_handler(message):
 
 
 def add_user(user_id):
-    global local_user_list
     try:
-        with open('users.csv', 'a', newline='') as csvfile:
+        with open(db_path, 'a', newline='\n') as csvfile:
             writer = csv.writer(csvfile, dialect='excel')
             writer.writerow([user_id, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")])
-            local_user_list.append(user_id)
     except Exception as e:
         close(e)
         return
@@ -132,7 +150,7 @@ def add_user(user_id):
 
 def send_to_all(message):
     try:
-        with open('users.csv') as f:
+        with open(db_path) as f:
             csv_reader = csv.reader(f)
             for user in csv_reader:
                 try:

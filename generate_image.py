@@ -56,9 +56,9 @@ def save_image(prompt):
         image = url_to_image(image_url)
         if image == 'Ошибка':
             file_path = 'Ошибка'
-        if not os.path.exists('images'):
-            os.makedirs('images')
-        file_path = f'images/{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.jpg'
+        if not os.path.exists('data/images'):
+            os.makedirs('data/images')
+        file_path = f'data/images/{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.jpg'
         image.save(file_path)
         print(f"Image saved to {file_path}")
         return file_path
